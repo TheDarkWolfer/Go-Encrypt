@@ -6,9 +6,11 @@ Allows you to create an AES key of 128, 256 or 512 bits, and use that key to enc
 Uses goroutines to parallel-process files, in order to enhance performance.
 
 QR Code for the download of the Windows version (.exe)
+
 ![Windows QR Code](./stripped-encryption-w.png)
 
 QR Code for the download of the Linux version (ELF)
+
 ![Linux QR Code](./stripped-encryption-l.png)
 
 Checksums : 
