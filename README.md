@@ -27,4 +27,4 @@ You can see the stripped version in there :
 ![Stripped Encryption tool QR code](./stripped-encryption.png)
 
 # Original goal
-My original goal was to get the compiled version of the stripped tool into a qr code, as I've seen (mattkc)[https://mattkc.com/etc/snakeqr/] do. Sadly, I currently lack the expertise and knowledge to do so (In my tests, the resulting executable was a thousand times bigger than it's source code, and by extension a thousand times too big to fit even if the biggest QR code format), especially given that I don't feel comfortable enough to tinker around with compiler settings. 
+My original goal was to get the compiled version of the stripped tool into a qr code, as I've seen [mattkc](https://mattkc.com/etc/snakeqr/) do. Sadly, I currently lack the expertise and knowledge to do so (In my tests, the resulting executable was a thousand times bigger than it's source code, and by extension a thousand times too big to fit even if the biggest QR code format), especially given that I don't feel comfortable enough to tinker around with compiler settings. 
