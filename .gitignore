@@ -2,3 +2,4 @@ encryption
 encryption.exe
 *.test
 *.enc
+*.key
