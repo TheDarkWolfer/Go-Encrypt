@@ -1,14 +1,15 @@
 #!/bin/bash
 
 # The chosen file
+GO_FILE="./encryption.go"
 GO_FILE=$1
 
 # The version string
+VERSION="42"
 VERSION=$2
 
 # Check if the user correctly provided the file to compile
-[ -z "$GO_FILE" ] && echo "First argument should be the go file to compile" && exit 1
-[ -z "$VERSION" ] && echo "Second argument should be the version number" && exit 1
+[ "$VERSION" == "42" ] && echo "Not specifying version number"
 
 echo "Building $GO_FILE for Linux"
 #Build for Linux and check if it compiled right, and notice the user of the result
