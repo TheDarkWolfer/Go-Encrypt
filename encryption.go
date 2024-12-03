@@ -6,6 +6,7 @@ package main
 //!/ improve error handling
 //!// improve UI (Hope ANSI escape codes do the trick)
 //!// more comments
+//!/ Fix issue where big files just eat up all the RAM
 
 /*
 This program is a small test program I wrote to familiarize myself with Go's syntax, workflow, and everything.
