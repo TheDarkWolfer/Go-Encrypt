@@ -3,3 +3,5 @@ encryption.exe
 *.test
 *.enc
 *.key
+PFP.png
+*.prof

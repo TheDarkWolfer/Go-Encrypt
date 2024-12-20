@@ -7,6 +7,7 @@ package main
 //!// improve UI (Hope ANSI escape codes do the trick)
 //!// more comments
 //!/ Fix issue where big files just eat up all the RAM
+//!// Fix issue where the "load key" choice does nothing
 
 /*
 This program is a small test program I wrote to familiarize myself with Go's syntax, workflow, and everything.
@@ -30,6 +31,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -110,7 +112,7 @@ func formatSize(bytes int64) string {
 		return fmt.Sprintf("%d B", bytes)
 	}
 
-	// Define the size suffixes in an array (slice of strings here)
+	// Define the size suffixes in an array (slice of strings here)												If you get the last one, the question still stands : What the fuck are you doing ???
 	sizes := []string{"KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB", "WhatTheFuckAreYouDoing"}
 	// Convert the size from an integer to a 64-bit float, since we'll be doing divisions
 	// that won't always land flat
@@ -127,6 +129,64 @@ func formatSize(bytes int64) string {
 	// and the unit's suffix
 	return YELLOW + fmt.Sprintf("%f %s", size, sizes[i-1]) + RESET
 
+}
+
+func getFreeRAM(debug bool) float64 {
+	var sysInfo syscall.Sysinfo_t
+	err := syscall.Sysinfo(&sysInfo)
+	if err != nil {
+		fmt.Printf("Error getting system info: %v\n", err)
+		return 0
+	}
+
+	// Available memory in bytes
+	availableMemory := sysInfo.Freeram * uint64(syscall.Getpagesize())
+	if debug {
+		fmt.Printf("Available RAM: %d bytes (%.2f MB)\n", availableMemory, float64(availableMemory)/(1024*1024))
+	}
+	return float64(availableMemory)
+}
+
+// Function to provide a warning if the file is too large, as files that are more than half
+// the currently free RAM will just crash the computer when we attempt to encrypt them. It's a band-aid
+// fix but it'll do the trick for now
+func isWarningNecessary(filename string, debug bool) {
+	// Size threshold in bytes
+	threshold := getFreeRAM(debug) / 2
+	var prompt string
+
+	RED := "\033[31m"
+	RESET := "\033[0m"
+
+	// Get file information
+	fileInfo, err := os.Stat(filename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Printf("File %s does not exist.\n", filename)
+		} else {
+			fmt.Printf("Error checking file: %v\n", err)
+		}
+		return
+	}
+
+	// Check the file size
+	fileSize := float64(fileInfo.Size())
+	if fileSize > threshold {
+		if debug {
+			fmt.Printf("File %s exceeds size threshold! Current size: %d bytes\n", filename, fileSize)
+		}
+
+		// Prompt the user for whether or not they want to proceed anyways
+		fmt.Printf(RED + "WARNING" + RESET + " : File %s is larger than half the currently \nfree RAM : Attempting to process it with the current version \nof the program, it can and probably will crash your computer")
+		fmt.Scanln(&prompt)
+
+	} else {
+		if debug {
+			fmt.Printf("File %s is below the size threshold. Current size: %d bytes\n", filename, fileSize)
+		} else {
+			return
+		}
+	}
 }
 
 // AES keys are used here in order to have symetric encryption
@@ -225,7 +285,7 @@ func encryptFile(key []byte, filename string, debug bool) {
 		fmt.Println(fmt.Sprintf(YELLOW+"Encryption rate 	:	%f bytes/second"+RESET, encryptionRate))
 	}
 	// Tell the user we succeeded, and display the encrypted file's name
-	fmt.Println("File encrypted successfully:", filename+".enc")
+	fmt.Println("File encrypted successfully : ", filename+".enc")
 }
 
 // Function to decrypt a given file using a provided key, and
@@ -307,7 +367,7 @@ func decryptFile(key []byte, filename string, debug bool) {
 	}
 	// Tell the user we succeeded in decrypting the file, alongside the
 	// decrypted file's name, in case the user needs it.
-	fmt.Println("File decrypted successfully:", filename+".dec")
+	fmt.Println("File decrypted successfully : ", filename+".dec")
 }
 
 // Function to write a key into a file after converting it into a hexadecimal string
@@ -323,7 +383,7 @@ func writeKeyToFileHex(key []byte, filename string) {
 		log.Fatal(err)
 	}
 	// Confirm we wrote the key to the given filename
-	fmt.Println("Key written to file:", filename)
+	fmt.Println("Key written to file : ", filename)
 }
 
 // Function to read a key from a file, and convert it from a hexadecimal
@@ -357,6 +417,11 @@ func encryptFiles(key []byte, filenames []string, wg *sync.WaitGroup, debug bool
 
 	// Iterate through all the files and encrypt them using the key provided by the user
 	for _, filename := range filenames {
+
+		// Check if the file is larger than half the currently free RAM,
+		// and notify the user if so
+		isWarningNecessary(filename, debug)
+
 		// Launch a goroutine for each file
 		go func(f string) {
 			encryptFile(key, f, debug)
@@ -374,6 +439,11 @@ func decryptFiles(key []byte, filenames []string, wg *sync.WaitGroup, debug bool
 	// Iterate through all the files and launch a goroutine for each of them
 	// in order to encrypt them
 	for _, filename := range filenames {
+
+		// Check if the file is larger than half the currently free RAM,
+		// and notify the user if so
+		isWarningNecessary(filename, debug)
+
 		// Launch a goroutine for each file
 		go func(f string) {
 			decryptFile(key, f, debug)
@@ -426,6 +496,10 @@ func main() {
 
 		// Prompt the user with different choices of actions to perform. Usage of several print statements instead of only one
 		// print statement and \n for the sake of readability and ease of modification
+		if len(keyname) > 0 {
+			fmt.Println("Currently loaded key : [" + GOLD + keyname + RESET + "]")
+		}
+
 		fmt.Println("Choose the operation you wish to perform : ")
 		fmt.Println(CYAN + "1. Create an AES key" + RESET)
 		fmt.Println(CYAN + "2. Encrypt files using AES-GCM" + RESET)
@@ -456,11 +530,14 @@ func main() {
 				fmt.Printf("%s ! %sThe key was already set as %s. Do you wish to use another ? (y/n)", GOLD, RESET, keyname)
 				fmt.Scanln(&prompt)
 				if strings.ToLower(prompt) == "y" {
-					fmt.Print("[" + GOLD + "KEY" + RESET + "]")
+					fmt.Printf("Enter the file containing your [" + GOLD + "KEY" + RESET + "]\n>")
 					fmt.Scanln(&keyname)
 				} else {
 					fmt.Println("Keeping the old key...")
 				}
+			} else {
+				fmt.Printf("Enter the file containing your [" + GOLD + "KEY" + RESET + "]\n>")
+				fmt.Scanln(&keyname)
 			}
 		case 3:
 			// Case 3 : The user wants to decrypt a file.
@@ -478,7 +555,7 @@ func main() {
 			// Get the files the user wants to encrypt
 			// The file list is separated by spaces and processed accordingly in order
 			// to allow us to deal with several files at once
-			fmt.Println("Enter the names of the files to decrypt (separated by spaces): ")
+			fmt.Println("Enter the names of the files to decrypt (separated by spaces) : ")
 			fmt.Scanln(&filenames) //user input for the target file(s)
 
 			// Splitting the file list provided by the user in a slice
@@ -495,12 +572,12 @@ func main() {
 			}
 
 			// Confirm the user's choice of key file and target file
-			fmt.Printf("Using key %s to decrypt files: %s", keyname, fileList)
+			fmt.Printf("Using key %s to decrypt files: %s \n", keyname, fileList)
 			fmt.Println("Is that correct? (y/n)") // Prompt the user for their confirmation
 			fmt.Scanln(&prompt)                   // Once again, user input
 
 			// Conversion to lowercase to save us conditions
-			if strings.ToLower(prompt) != "y" {
+			if strings.ToLower(prompt) == "y" {
 				// And if we fail the test, we abort and exit
 				fmt.Println(RED + "ABORTING..." + RESET)
 				os.Exit(1)
@@ -543,15 +620,12 @@ func main() {
 			}
 
 			// Prompt the user for confirmation to encrypt the given file using the key.
-			fmt.Printf("Using key %s to encrypt files: %s", keyname, fileList)
+			fmt.Printf("Using key %s to encrypt files: %s \n", keyname, fileList)
 			fmt.Println("Is that correct? (y/n)")
 			fmt.Scanln(&prompt)
 
 			// Conversion of the string to lowercase in order to write less code by writing more
-			if strings.ToLower(prompt) != "y" {
-				fmt.Println(RED + "ABORTING..." + RESET)
-				os.Exit(1)
-			} else {
+			if strings.ToLower(prompt) == "y" || strings.ToLower(prompt) == "yes" {
 				// Create a work group for the encryption process
 				wg.Add(1)
 				// Start the process of encrypting all files from the list
@@ -559,7 +633,11 @@ func main() {
 				// Wait for all files to be processed
 				wg.Wait()
 				// And then we tell the user we did a good job !
-				fmt.Println(GREEN + "Successfully encrypted files!" + RESET)
+				fmt.Println(GREEN + "Successfully encrypted files ! " + RESET)
+			} else {
+
+				fmt.Println(RED + "ABORTING..." + RESET)
+				os.Exit(1)
 			}
 		case 1:
 			// Case 1 : the user wants to generate an AES key
@@ -573,7 +651,7 @@ func main() {
 				and 7.53gB/s in decryption.
 			*/
 
-			fmt.Println("Please select the size of the key you wish to generate.")
+			fmt.Println("\nPlease select the size of the key you wish to generate.")
 			fmt.Println("128-bit AES --- 16 bytes of size")
 			fmt.Println("256-bit AES --- 24 bytes of size")
 			fmt.Println("512-bit AES --- 32 bytes of size")
