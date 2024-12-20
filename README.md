@@ -1,4 +1,4 @@
-# Camille's GO Encryption Tool [^1]
+# Camille's GO Encryption Tool
 
 It's what it says on the tin, encryption tool written in go.
 Allows you to create an AES key of 128, 256 or 512 bits, and use that key to encrypt/decrypt files.
